@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>물류 AMR의 최소시간 경로 시뮬레이터</title>
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+
+  <!-- 헤더 영역 -->
+  <header class="app-header">
+    <div class="brand-section">
+      <div class="brand-icon">🤖</div>
+      <div>
+        <h1 class="brand-title">
+          물류 AMR의 최소시간 경로 시뮬레이터
+          <span class="brand-badge">인공지능을 위한 이산수학 주제탐구</span>
+        </h1>
+      </div>
+    </div>
+    <div class="header-status">
+      <div class="mode-pill">
+        <span class="pulse-dot"></span>
+        <span id="systemModeLabel">수동 시뮬레이션 모드</span>
+      </div>
+      <div>속도: 1.0 m/s | 90° 회전: 0.5초</div>
+    </div>
+  </header>
+
+  <!-- 메인 레이아웃 -->
+  <main class="main-layout">
+
+    <!-- 좌측: 3D 물류 창고 뷰포트 -->
+    <section class="viewport-card">
+      <div class="viewport-toolbar">
+        <div class="toolbar-left">
+          <button id="btnToggleGraph" class="btn-tool" type="button" title="꼭짓점 좌표 및 통로별 가중치/회전 시간 표시">
+            <span>📐</span> 그래프 보기 (정점/통로/가중치)
+          </button>
+          <button id="btnResetView" class="btn-tool" type="button" title="기본 카메라 시점으로 복귀">
+            <span>🎥</span> 시점 복귀
+          </button>
+        </div>
+        <div class="toolbar-right">
+          <label style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+            배속:
+            <select id="speedSelect" style="background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border-subtle); border-radius: 4px; padding: 2px 6px; font-size: 0.8rem;">
+              <option value="1">1.0x (실시간)</option>
+              <option value="2" selected>2.0x (발표 권장)</option>
+              <option value="4">4.0x (빠른 시연)</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <!-- 3D 캔버스 컨테이너 -->
+      <div id="threeContainer" class="three-container">
+        <!-- HUD 오버레이 -->
+        <div class="hud-overlay">
+          <div class="hud-chip">
+            <span>선택 경로:</span>
+            <strong id="hudRouteText" class="badge-a">경로 A (직진 S → T)</strong>
+          </div>
+          <div class="hud-chip">
+            <span>주행 상태:</span>
+            <strong id="hudStatusText">출발 대기 중</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- 뷰포트 하단 재생 제어바 -->
+      <div class="viewport-footer">
+        <div class="playback-controls">
+          <div class="btn-group">
+            <button id="btnPlay" class="btn-primary" type="button">
+              <span id="btnPlayIcon">▶</span> <span id="btnPlayText">주행 시작</span>
+            </button>
+            <button id="btnPause" class="btn-secondary" type="button">
+              <span>⏸</span> 일시정지
+            </button>
+            <button id="btnReset" class="btn-secondary" type="button">
+              <span>🔄</span> 초기화
+            </button>
+          </div>
+
+          <div style="font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 12px;">
+            <span>모의 주행 시간: <strong id="simCurrentTime" style="color: #fff;">0.0</strong> / <span id="simTotalTime">12.0</span>초</span>
+          </div>
+        </div>
+
+        <!-- 진행 프로그레스 바 -->
+        <div class="timeline-bar-container">
+          <span style="min-width: 45px;">S (0,0)</span>
+          <div class="timeline-progress-track">
+            <div id="simProgressBar" class="timeline-progress-fill"></div>
+          </div>
+          <span style="min-width: 45px; text-align: right;">T (12,0)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 우측: 관제 컨트롤 및 데이터 패널 -->
+    <aside class="panel-sidebar">
+
+      <!-- 1. 경로 비교 및 판정 섹션 -->
+      <section class="panel-section">
+        <div class="section-header">
+          <h2 class="section-title">
+            <span>📊</span> 가중치 그래프 경로 비교
+          </h2>
+          <span id="decisionBadge" class="section-tag" style="color: var(--accent-cyan); font-weight: 700;">A 최적</span>
+        </div>
+
+        <!-- 비교 카드 그리드 -->
+        <div class="comparison-grid">
+          <!-- 경로 A -->
+          <div id="cardRouteA" class="route-card selected">
+            <span class="route-badge badge-route-a">경로 A (직진)</span>
+            <h3 class="card-title">S → T</h3>
+            <div class="card-total-time">
+              <span id="timeAVal">12.0</span><span>초</span>
+            </div>
+            <ul class="card-details-list">
+              <li><span>이동 거리</span><strong>12 m</strong></li>
+              <li><span>주행 시간 (1m/s)</span><strong>12.0 초</strong></li>
+              <li><span>회전 횟수 / 시간</span><strong>0회 / 0.0 초</strong></li>
+              <li><span>재확인 예상 대기 d</span><strong id="cardWaitA" style="color: var(--accent-cyan);">+0.0 초</strong></li>
+            </ul>
+          </div>
+
+          <!-- 경로 B -->
+          <div id="cardRouteB" class="route-card">
+            <span class="route-badge badge-route-b">경로 B (우회)</span>
+            <h3 class="card-title">S → U → V → T</h3>
+            <div class="card-total-time">
+              <span>15.0</span><span>초</span>
+            </div>
+            <ul class="card-details-list">
+              <li><span>이동 거리</span><strong>14 m</strong></li>
+              <li><span>주행 시간 (1m/s)</span><strong>14.0 초</strong></li>
+              <li><span>회전 횟수 / 시간</span><strong>2회 (90°) / 1.0 초</strong></li>
+              <li><span>재확인 예상 대기</span><strong>0.0 초</strong></li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 동률 시 경로 선택 바 (평상시 숨김) -->
+        <div id="tieSelectorBar" class="tie-selector-bar" style="display: none;">
+          <div>
+            <strong>⚖️ 소요 시간 동률 (15.0초)</strong>
+            <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">시연할 주행 경로를 선택하세요 (기본값: A)</div>
+          </div>
+          <div class="tie-options">
+            <label>
+              <input type="radio" name="tieRouteSelect" value="A" checked> 직진 A
+            </label>
+            <label>
+              <input type="radio" name="tieRouteSelect" value="B"> 우회 B
+            </label>
+          </div>
+        </div>
+
+        <!-- 대기 시간 d 슬라이더 컨트롤 -->
+        <div class="slider-group">
+          <div class="slider-label-row">
+            <span>직진 경로 재확인 예상 대기 <strong>(d)</strong></span>
+            <div><span id="sliderValDisplay" class="slider-current-val">0.0</span> 초</div>
+          </div>
+          <input id="delaySlider" type="range" class="custom-range" min="0" max="6" step="0.1" value="0">
+          
+          <!-- 프리셋 버튼 -->
+          <div class="preset-buttons-row">
+            <button type="button" class="btn-preset active" data-val="0">0.0초 (A 직진)</button>
+            <button type="button" class="btn-preset" data-val="3">3.0초 (전환점·동률)</button>
+            <button type="button" class="btn-preset" data-val="5">5.0초 (B 우회)</button>
+          </div>
+        </div>
+
+        <!-- 판정 결과 배너 -->
+        <div id="decisionBanner" class="decision-result-banner">
+          <span id="decisionBannerText">직진 경로 A 최적 (3.0초 더 빠름)</span>
+          <span style="font-size: 0.72rem; color: var(--text-muted);">전환점: d = 3.0초</span>
+        </div>
+      </section>
+
+      <!-- 2. 실제 주행 영상 분석 (TorWIC-SLAM) 섹션 -->
+      <section class="panel-section">
+        <div class="section-header">
+          <h2 class="section-title">
+            <span>📹</span> 실제 주행 영상 분석
+          </h2>
+          <span class="section-tag">TorWIC-SLAM</span>
+        </div>
+
+        <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 8px;">
+          출처: <strong>TorWIC-SLAM, Aisle_CCW, 왼쪽 카메라</strong>
+        </div>
+
+        <div class="analysis-stat-grid">
+          <div class="stat-box">
+            <div class="stat-label">사례 분석 구간</div>
+            <div class="stat-val">96.39 → 96.49초</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">평균 영상 밝기 변화량</div>
+            <div class="stat-val val-highlight">Δ 0.0201</div>
+          </div>
+          <div class="stat-box" style="grid-column: span 2;">
+            <div class="stat-label">특징점 추적 유지율 (ORB/KLT 관측값)</div>
+            <div class="stat-val val-warning">48.5% <span style="font-size: 0.75rem; font-weight: normal; color: var(--text-muted);">(특징점 51.5% 급격 소실)</span></div>
+          </div>
+        </div>
+
+        <div class="correlation-box">
+          <strong>📊 756쌍 프레임 통계 분석 (간격 0.09~0.11초):</strong><br>
+          • 평균 영상 밝기 vs 추적 유지율: 피어슨 상관계수 <strong>r = 0.081</strong> (미미한 연관)<br>
+          • 밝기 변화량 vs 추적 유지율: 피어슨 상관계수 <strong>r = -0.256</strong> (음의 상관: 급격한 밝기 변화가 추적 소실 유발)
+        </div>
+
+        <div class="concept-legend">
+          <div>• <strong>[관측값]</strong> 영상 밝기(정규화 픽셀 밝기 0~1) 및 48.5% 특징점 유지율</div>
+          <div>• <strong>[시뮬레이션 가정값]</strong> 재확인 예상 대기 시간 <em>d</em> (사용자 설정 변수)</div>
+          <div>• <strong>[이산수학 전환점]</strong> 3.0초 (두 경로의 기하학적 기본 소요 시간 차이 $15 - 12 = 3$초)</div>
+        </div>
+
+        <a class="dataset-link" href="https://github.com/Viky397/TorWICDataset" target="_blank" rel="noopener noreferrer">
+          🔗 TorWICDataset GitHub 저장소 방문 ↗
+        </a>
+      </section>
+
+      <!-- 3. MATLAB AI 예측 결과 연결 및 재생 섹션 -->
+      <section class="panel-section">
+        <div class="section-header">
+          <h2 class="section-title">
+            <span>🧠</span> MATLAB AI 예측 결과 연결
+          </h2>
+          <span id="aiStatusPill" class="section-tag">수동 모드</span>
+        </div>
+
+        <!-- 파일 로드 컨트롤 -->
+        <div class="file-input-wrapper">
+          <label class="btn-file-select" for="fileInputJSON">
+            📁 예측 JSON 파일 선택...
+          </label>
+          <input type="file" id="fileInputJSON" class="file-input-hidden" accept=".json">
+          <button id="btnLoadSampleJSON" class="btn-tool" type="button" title="제공된 샘플 predictions.json 불러오기">
+            샘플 불러오기
+          </button>
+        </div>
+
+        <!-- 상태 / 안내 문구 -->
+        <div id="aiNoticeBox" class="ai-status-message">
+          💡 AI 예측 결과 파일을 연결하면 재생할 수 있습니다.
+        </div>
+
+        <!-- 예측 재생 플레이어 (데이터 로드 시 표시) -->
+        <div id="aiPlaybackPanel" class="ai-playback-card" style="display: none;">
+          <div class="playback-step-row">
+            <div>
+              <strong>기록 <span id="recCurrentIdx">1</span> / <span id="recTotalCount">6</span></strong>
+              <span id="recNote" style="font-size: 0.72rem; color: var(--text-subtle); margin-left: 6px;"></span>
+            </div>
+            <div class="btn-group">
+              <button id="btnPrevRec" class="btn-tool" type="button">◀ 이전</button>
+              <button id="btnNextRec" class="btn-tool" type="button">다음 ▶</button>
+            </div>
+          </div>
+
+          <!-- 타임스탬프 구분 표시 -->
+          <div class="timestamp-badges">
+            <div id="pillDecisionTime" class="time-pill active">
+              예측 시각: <strong id="valDecisionTime">96.39</strong>s
+            </div>
+            <div id="pillTargetTime" class="time-pill">
+              결과 확인 시각: <strong id="valTargetTime">96.49</strong>s
+            </div>
+          </div>
+
+          <!-- AI 예측 위험도 및 MATLAB 경고 -->
+          <div class="ai-prediction-box">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="font-size: 0.78rem; color: var(--text-muted);">추적 위험 확률 (유지율 &lt; 90%):</span>
+              <strong id="valRiskProb" style="color: var(--accent-cyan); font-size: 0.95rem;">88.0%</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 0.78rem; color: var(--text-muted);">MATLAB 경고 판정:</span>
+              <span id="badgeWarning" class="warning-indicator warn-true">⚠️ WARNING (위험)</span>
+            </div>
+          </div>
+
+          <!-- 실제 결과 (2단계 공개) -->
+          <div class="actual-retention-box">
+            <span>다음 프레임 실제 유지율:</span>
+            <div id="valActualRetention" class="retention-hidden">
+              (검증 대기 중...)
+            </div>
+          </div>
+
+          <!-- 재생 스텝 조작 버튼 -->
+          <div style="display: flex; gap: 8px; margin-top: 10px;">
+            <button id="btnStepPredict" class="btn-secondary" style="flex: 1; font-size: 0.78rem;" type="button">
+              1단계: 예측 시점
+            </button>
+            <button id="btnStepReveal" class="btn-primary" style="flex: 1; font-size: 0.78rem;" type="button">
+              2단계: 실제 결과 공개
+            </button>
+          </div>
+
+          <div style="font-size: 0.72rem; color: var(--text-subtle); margin-top: 8px; line-height: 1.4;">
+            ※ 선택된 레코드의 MATLAB 경고가 있으면, 설정된 재확인 대기(d)를 분기점 S에 반영하여 시뮬레이터에 연결합니다.
+          </div>
+        </div>
+      </section>
+
+    </aside>
+  </main>
+
+  <!-- 푸터 -->
+  <footer class="app-footer">
+    <div>
+      고등학교 「인공지능을 위한 이산수학」 주제탐구 발표 | 물류 AMR 최소시간 경로 시뮬레이터
+    </div>
+    <div>
+      자료: MATLAB 최적화 모델 & TorWIC-SLAM 데이터셋
+    </div>
+  </footer>
+
+  <!-- 메인 애플리케이션 진입점 (ES Module) -->
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
