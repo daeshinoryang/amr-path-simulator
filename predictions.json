@@ -1,0 +1,56 @@
+[
+  {
+    "id": 1,
+    "decision_time_s": 95.10,
+    "target_time_s": 95.20,
+    "risk_probability": 0.08,
+    "warning": false,
+    "actual_retention_pct": 94.2,
+    "note": "정상 주행 구간 (조도 균일)"
+  },
+  {
+    "id": 2,
+    "decision_time_s": 95.60,
+    "target_time_s": 95.70,
+    "risk_probability": 0.12,
+    "warning": false,
+    "actual_retention_pct": 91.8,
+    "note": "정상 주행 구간 (선반 반사광 미미)"
+  },
+  {
+    "id": 3,
+    "decision_time_s": 96.00,
+    "target_time_s": 96.10,
+    "risk_probability": 0.25,
+    "warning": false,
+    "actual_retention_pct": 89.5,
+    "note": "조도 변화 시작 지점"
+  },
+  {
+    "id": 4,
+    "decision_time_s": 96.39,
+    "target_time_s": 96.49,
+    "risk_probability": 0.88,
+    "warning": true,
+    "actual_retention_pct": 48.5,
+    "note": "실제 관측 사례 구간 (강한 바닥 반사광 및 역광으로 특징점 소실 급증)"
+  },
+  {
+    "id": 5,
+    "decision_time_s": 96.80,
+    "target_time_s": 96.90,
+    "risk_probability": 0.72,
+    "warning": true,
+    "actual_retention_pct": 62.3,
+    "note": "특징점 추적 불안정 지속 구간"
+  },
+  {
+    "id": 6,
+    "decision_time_s": 97.40,
+    "target_time_s": 97.50,
+    "risk_probability": 0.15,
+    "warning": false,
+    "actual_retention_pct": 93.0,
+    "note": "안정 구역 진입 완료"
+  }
+]
